@@ -16,10 +16,11 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String _selectedRole = 'student';
+  String _passwordFeedback = '';
 
   @override
   void dispose() {
@@ -34,7 +35,8 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+    authProvider.clearError(); // Clear any previous errors
+
     final success = await authProvider.signup(
       name: _nameController.text,
       email: _emailController.text,
@@ -51,7 +53,7 @@ class _SignupScreenState extends State<SignupScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      
+
       // Navigate to main layout
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const MainLayout()),
@@ -103,12 +105,41 @@ class _SignupScreenState extends State<SignupScreen> {
                     style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 32),
-                  
+
+                  // Error Message Display (if any)
+                  if (authProvider.errorMessage != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7F1D1D),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFCA5A5), width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFFCA5A5), size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              authProvider.errorMessage!,
+                              style: const TextStyle(
+                                color: Color(0xFFFCA5A5),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
                   // Name Field
                   _buildTextField(
                     controller: _nameController,
                     label: 'YOUR NAME',
                     icon: Icons.person_outline,
+                    onChanged: (_) => Provider.of<AuthProvider>(context, listen: false).clearError(),
                     validator: (value) {
                       if (value == null || value.trim().length < 2) return 'Enter your full name';
                       return null;
@@ -122,6 +153,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     label: 'EMAIL',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) => Provider.of<AuthProvider>(context, listen: false).clearError(),
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Email is required';
                       if (!AuthProvider.isValidEmail(value)) return 'Enter a valid email';
@@ -162,6 +194,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     label: 'PASSWORD',
                     icon: Icons.lock_outline,
                     obscureText: _obscurePassword,
+                    onChanged: (value) => setState(() {}),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -173,11 +206,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       if (value == null || value.isEmpty) return 'Password is required';
                       final errors = AuthProvider.validatePassword(value);
                       if (errors.isNotEmpty) {
-                        return 'Must include: ${errors.join(", ")}';
+                        return null; // Show errors in feedback widget instead
                       }
                       return null;
                     },
                   ),
+                  const SizedBox(height: 12),
+
+                  // Password Strength Indicator
+                  if (_passwordController.text.isNotEmpty)
+                    _buildPasswordStrengthIndicator(_passwordController.text),
+
                   const SizedBox(height: 16),
 
                   // Confirm Password Field
@@ -264,12 +303,14 @@ class _SignupScreenState extends State<SignupScreen> {
     Widget? suffixIcon,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       style: const TextStyle(color: Colors.white),
       keyboardType: keyboardType,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
@@ -292,6 +333,69 @@ class _SignupScreenState extends State<SignupScreen> {
         errorMaxLines: 3,
       ),
       validator: validator,
+    );
+  }
+
+  Widget _buildPasswordStrengthIndicator(String password) {
+    final errors = AuthProvider.validatePassword(password);
+    final isLongEnough = password.length >= 6;
+    final hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
+    final hasLowercase = RegExp(r'[a-z]').hasMatch(password);
+    final hasNumber = RegExp(r'[0-9]').hasMatch(password);
+    final hasSpecial = RegExp(r'[!@#\$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]').hasMatch(password);
+
+    final requirements = [
+      ('At least 6 characters', isLongEnough),
+      ('Uppercase letter (A-Z)', hasUppercase),
+      ('Lowercase letter (a-z)', hasLowercase),
+      ('Number (0-9)', hasNumber),
+      ('Special character (!@#\$%^&*)', hasSpecial),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: errors.isEmpty ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Password Requirements:',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...requirements.map((req) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Row(
+              children: [
+                Icon(
+                  req.$2 ? Icons.check_circle : Icons.circle_outlined,
+                  color: req.$2 ? const Color(0xFF10B981) : Colors.grey,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  req.$1,
+                  style: TextStyle(
+                    color: req.$2 ? const Color(0xFF10B981) : Colors.grey,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
     );
   }
 }

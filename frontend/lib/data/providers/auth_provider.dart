@@ -249,7 +249,8 @@ class AuthProvider with ChangeNotifier {
       } else {
         // Server may return a list of errors
         if (data['errors'] != null && data['errors'] is List) {
-          _errorMessage = (data['errors'] as List).join('\n');
+          final errorsList = (data['errors'] as List).cast<String>();
+          _errorMessage = 'Password requirements not met:\n• ${errorsList.join('\n• ')}';
         } else {
           _errorMessage = data['message'] ?? 'Signup failed. Please try again.';
         }

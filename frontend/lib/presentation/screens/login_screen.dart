@@ -100,10 +100,39 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 32),
-                  
+
+                  // Error Message Display (if any)
+                  if (authProvider.errorMessage != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7F1D1D),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFCA5A5), width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFFCA5A5), size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              authProvider.errorMessage!,
+                              style: const TextStyle(
+                                color: Color(0xFFFCA5A5),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
                   // Email Field
                   TextFormField(
                     controller: _emailController,
+                    onChanged: (_) => Provider.of<AuthProvider>(context, listen: false).clearError(),
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: 'EMAIL',
@@ -136,6 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Password Field
                   TextFormField(
                     controller: _passwordController,
+                    onChanged: (_) => Provider.of<AuthProvider>(context, listen: false).clearError(),
                     obscureText: _obscurePassword,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
