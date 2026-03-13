@@ -14,7 +14,7 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(cors());
+app.use(cors()); // Allows connections from other devices
 app.use(express.json());
 
 // Routes
@@ -28,4 +28,7 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Explicitly listen on 0.0.0.0 to allow external network connections
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://10.223.111.90:${PORT}`);
+});

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../../core/api_config.dart';
 
 class AuthProvider with ChangeNotifier {
-  // ─── State ───────────────────────────────────────────────────────────────
+
+  // ─── STATE ─────────────────────────────────────────────
   bool _isAuthenticated = false;
   bool _isLoading = false;
+
   String? _token;
   String? _userId;
   String? _userName;
@@ -14,7 +17,7 @@ class AuthProvider with ChangeNotifier {
   String? _userRole;
   String? _errorMessage;
 
-  // ─── Getters ─────────────────────────────────────────────────────────────
+  // ─── GETTERS ───────────────────────────────────────────
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get token => _token;
@@ -24,51 +27,55 @@ class AuthProvider with ChangeNotifier {
   String? get userRole => _userRole;
   String? get errorMessage => _errorMessage;
 
-  static const String _baseUrl = 'http://10.223.111.90:5000';
+  // Use dynamic base URL from API config
+  String get _baseUrl => ApiConfig.getConfiguredUrl();
   static const String _tokenKey = 'auth_token';
   static const String _rememberMeKey = 'remember_me';
 
-  // ─── Password Validation ─────────────────────────────────────────────────
-  /// Returns a list of unmet password requirements.
-  /// Empty list means the password is valid.
+  // ─── PASSWORD VALIDATION ───────────────────────────────
   static List<String> validatePassword(String password) {
     final errors = <String>[];
+
     if (password.length < 6) {
       errors.add('At least 6 characters');
     }
+
     if (!RegExp(r'[A-Z]').hasMatch(password)) {
       errors.add('At least one uppercase letter (A-Z)');
     }
+
     if (!RegExp(r'[a-z]').hasMatch(password)) {
       errors.add('At least one lowercase letter (a-z)');
     }
+
     if (!RegExp(r'[0-9]').hasMatch(password)) {
       errors.add('At least one number (0-9)');
     }
-    if (!RegExp(r'[!@#\$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]').hasMatch(password)) {
+
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(password)) {
       errors.add('At least one special character (!@#\$%^&*)');
     }
+
     return errors;
   }
 
-  /// Returns true if the email format is valid.
+  // ─── EMAIL VALIDATION ──────────────────────────────────
   static bool isValidEmail(String email) {
     return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
   }
 
-  // ─── Persistence ─────────────────────────────────────────────────────────
-  /// Checks SharedPreferences for a saved token and verifies it with the server.
-  /// Call this on app startup.
+  // ─── AUTO LOGIN ────────────────────────────────────────
   Future<bool> tryAutoLogin() async {
+
     final prefs = await SharedPreferences.getInstance();
     final rememberMe = prefs.getBool(_rememberMeKey) ?? false;
 
     if (!rememberMe) return false;
 
     final savedToken = prefs.getString(_tokenKey);
+
     if (savedToken == null || savedToken.isEmpty) return false;
 
-    // Verify the token is still valid by calling /api/auth/me
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/api/auth/me'),
@@ -79,64 +86,73 @@ class AuthProvider with ChangeNotifier {
       ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
+
         final data = json.decode(response.body);
+
         _token = savedToken;
         _userId = data['_id'];
         _userName = data['name'];
         _userEmail = data['email'];
         _userRole = data['role'];
+
         _isAuthenticated = true;
+
         notifyListeners();
         return true;
       } else {
-        // Token expired or invalid — clear it
+
         await _clearSavedToken();
         return false;
       }
-    } catch (_) {
-      // Server unreachable — still restore session from stored data
-      // (offline-first approach)
+    } catch (e) {
+      debugPrint('Auto-login error: $e');
       return false;
     }
   }
 
+  // ─── TOKEN STORAGE ─────────────────────────────────────
   Future<void> _clearSavedToken() async {
+
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.remove(_tokenKey);
     await prefs.remove(_rememberMeKey);
   }
 
   Future<void> _saveToken(String token, bool rememberMe) async {
+
     final prefs = await SharedPreferences.getInstance();
+
     if (rememberMe) {
       await prefs.setString(_tokenKey, token);
       await prefs.setBool(_rememberMeKey, true);
     } else {
-      // Clear any saved token for non-remember sessions
       await prefs.remove(_tokenKey);
       await prefs.setBool(_rememberMeKey, false);
     }
   }
 
-  // ─── Login ────────────────────────────────────────────────────────────────
+  // ─── LOGIN ─────────────────────────────────────────────
   Future<bool> login({
     required String email,
     required String password,
     required bool rememberMe,
   }) async {
+
     _errorMessage = null;
 
-    // ── Client-side validation ──
     if (email.isEmpty) {
       _errorMessage = 'Please enter your email address.';
       notifyListeners();
       return false;
     }
+
     if (!isValidEmail(email)) {
-      _errorMessage = 'Please enter a valid email address (e.g. user@example.com).';
+      _errorMessage = 'Please enter a valid email address.';
       notifyListeners();
       return false;
     }
+
     if (password.isEmpty) {
       _errorMessage = 'Please enter your password.';
       notifyListeners();
@@ -147,6 +163,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -155,36 +172,48 @@ class AuthProvider with ChangeNotifier {
           'password': password,
           'rememberMe': rememberMe,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15)); // Increased timeout
 
       final data = json.decode(response.body);
 
       if (response.statusCode == 200) {
+
         _token = data['token'];
         _userId = data['_id'];
         _userName = data['name'];
         _userEmail = data['email'];
         _userRole = data['role'];
+
         _isAuthenticated = true;
+
         await _saveToken(_token!, rememberMe);
+
         _isLoading = false;
         notifyListeners();
+
         return true;
       } else {
-        _errorMessage = data['message'] ?? 'Login failed. Please try again.';
+
+        _errorMessage = data['message'] ?? 'Login failed';
+
         _isLoading = false;
         notifyListeners();
+
         return false;
       }
+
     } catch (e) {
-      _errorMessage = 'Unable to connect to server. Please check your connection.';
+      debugPrint('Login connection error: $e');
+      _errorMessage = 'Unable to connect to server. Please check your internet and server status.';
+
       _isLoading = false;
       notifyListeners();
+
       return false;
     }
   }
 
-  // ─── Signup ───────────────────────────────────────────────────────────────
+  // ─── SIGNUP ────────────────────────────────────────────
   Future<bool> signup({
     required String name,
     required String email,
@@ -193,27 +222,34 @@ class AuthProvider with ChangeNotifier {
     String role = 'student',
     String phone = '',
   }) async {
+
     _errorMessage = null;
 
-    // ── Client-side validation ──
     if (name.trim().length < 2) {
-      _errorMessage = 'Name must be at least 2 characters.';
+      _errorMessage = 'Name must be at least 2 characters';
       notifyListeners();
       return false;
     }
+
     if (!isValidEmail(email)) {
-      _errorMessage = 'Please enter a valid email address (e.g. user@example.com).';
+      _errorMessage = 'Please enter a valid email';
       notifyListeners();
       return false;
     }
+
     final passwordErrors = validatePassword(password);
+
     if (passwordErrors.isNotEmpty) {
-      _errorMessage = 'Password requirements not met:\n• ${passwordErrors.join('\n• ')}';
+
+      _errorMessage =
+          'Password requirements not met:\n• ${passwordErrors.join('\n• ')}';
+
       notifyListeners();
       return false;
     }
+
     if (password != confirmPassword) {
-      _errorMessage = 'Passwords do not match.';
+      _errorMessage = 'Passwords do not match';
       notifyListeners();
       return false;
     }
@@ -222,6 +258,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/signup'),
         headers: {'Content-Type': 'application/json'},
@@ -232,54 +269,66 @@ class AuthProvider with ChangeNotifier {
           'role': role,
           'phone': phone,
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15)); // Increased timeout
 
       final data = json.decode(response.body);
 
       if (response.statusCode == 201) {
+
         _token = data['token'];
         _userId = data['_id'];
         _userName = data['name'];
         _userEmail = data['email'];
         _userRole = data['role'];
+
         _isAuthenticated = true;
+
         _isLoading = false;
         notifyListeners();
+
         return true;
+
       } else {
-        // Server may return a list of errors
-        if (data['errors'] != null && data['errors'] is List) {
-          final errorsList = (data['errors'] as List).cast<String>();
-          _errorMessage = 'Password requirements not met:\n• ${errorsList.join('\n• ')}';
-        } else {
-          _errorMessage = data['message'] ?? 'Signup failed. Please try again.';
-        }
+
+        _errorMessage = data['message'] ?? 'Signup failed';
+
         _isLoading = false;
         notifyListeners();
+
         return false;
       }
+
     } catch (e) {
-      _errorMessage = 'Unable to connect to server. Please check your connection.';
+      debugPrint('Signup connection error: $e');
+      _errorMessage = 'Unable to connect to server. Please check your internet and server status.';
+
       _isLoading = false;
       notifyListeners();
+
       return false;
     }
   }
 
-  // ─── Logout ───────────────────────────────────────────────────────────────
+  // ─── LOGOUT ────────────────────────────────────────────
   Future<void> logout() async {
+
     _isAuthenticated = false;
+
     _token = null;
     _userId = null;
     _userName = null;
     _userEmail = null;
     _userRole = null;
+
     _errorMessage = null;
+
     await _clearSavedToken();
+
     notifyListeners();
   }
 
   void clearError() {
+
     _errorMessage = null;
     notifyListeners();
   }

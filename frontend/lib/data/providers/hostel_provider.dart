@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../core/api_config.dart';
 
 class HostelProvider with ChangeNotifier {
   List<dynamic> _hostels = [];
@@ -9,14 +10,8 @@ class HostelProvider with ChangeNotifier {
   List<dynamic> get hostels => _hostels;
   bool get isLoading => _isLoading;
 
-  // -----------------------------------------------------------------------
-  // IMPORTANT: Set this to your computer's local IP address when testing
-  // on a real phone (e.g., 'http://192.168.1.5:5000').
-  // Use 'http://10.0.2.2:5000' ONLY for Android emulator.
-  // Use 'http://localhost:5000' only for iOS simulator.
-  // For production, use your actual deployed server URL.
-  // -----------------------------------------------------------------------
-  static const String _baseUrl = 'http://10.223.111.90:5000';
+  // Use dynamic base URL from API config
+  String get _baseUrl => ApiConfig.getConfiguredUrl();
 
   Future<void> fetchHostels() async {
     _isLoading = true;
