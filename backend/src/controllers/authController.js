@@ -81,6 +81,18 @@ const registerUser = async (req, res) => {
       });
     }
 
+    if (!phone || phone.trim().length === 0) {
+      return res.status(400).json({ message: 'Phone number is required.' });
+    }
+
+    if (!/^[0-9]+$/.test(phone.trim())) {
+      return res.status(400).json({ message: 'Phone number must contain only digits.' });
+    }
+
+    if (phone.trim().length !== 10) {
+      return res.status(400).json({ message: 'Phone number must be exactly 10 digits.' });
+    }
+
     // --- Check existing user ---
     const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
@@ -185,7 +197,21 @@ const updateProfile = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (req.body.name) user.name = req.body.name.trim();
-    if (req.body.phone !== undefined) user.phone = req.body.phone.trim();
+    if (req.body.phone !== undefined) {
+      const phone = req.body.phone.trim();
+      
+      // Validate phone
+      if (phone && phone.length > 0) {
+        if (!/^[0-9]+$/.test(phone)) {
+          return res.status(400).json({ message: 'Phone number must contain only digits.' });
+        }
+        if (phone.length !== 10) {
+          return res.status(400).json({ message: 'Phone number must be exactly 10 digits.' });
+        }
+      }
+      
+      user.phone = phone;
+    }
 
     const updated = await user.save();
     res.json({ _id: updated._id, name: updated.name, email: updated.email, role: updated.role, phone: updated.phone });

@@ -509,22 +509,8 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
                     ),
                   ),
                 if (!isOsm) const SizedBox(width: 20),
-                // Buttons
-                if (isOsm)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.map, size: 18),
-                      label: const Text('Open in Maps', style: TextStyle(fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () => _openInMaps(hostel),
-                    ),
-                  )
-                else
+                // Book Now button (only for non-OSM, non-admin users)
+                if (!isOsm)
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -714,23 +700,5 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
     if (f.contains('library') || f.contains('study')) return Icons.menu_book;
     if (f.contains('water')) return Icons.water_drop;
     return Icons.check_circle_outline;
-  }
-
-  void _openInMaps(dynamic hostel) {
-    try {
-      final loc = hostel['location'];
-      if (loc == null) return;
-      final lat = loc['lat'];
-      final lng = loc['lng'];
-      final name = Uri.encodeComponent(hostel['name'] ?? 'Hostel');
-      // Using a simple url launcher logic or specific package if available. 
-      // For now, I'll assume we show a toast or similar if we can't launch.
-      final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-      // In a real app we'd use url_launcher.
-      _showSnack('Opening location in Google Maps...');
-      debugPrint('Launch URL: $url');
-    } catch (e) {
-      _showSnack('Could not open maps.', isError: true);
-    }
   }
 }

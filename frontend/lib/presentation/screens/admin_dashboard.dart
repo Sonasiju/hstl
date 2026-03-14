@@ -4,8 +4,8 @@ import '../../data/providers/auth_provider.dart';
 import 'create_hostel_screen.dart';
 import 'admin_hostel_list_screen.dart';
 import 'admin_bookings_screen.dart';
-import 'hostel_applicants_screen.dart';
 import 'profile_screen.dart';
+import 'login_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({Key? key}) : super(key: key);
@@ -182,23 +182,6 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 16),
             _buildAdminCard(
               context,
-              title: 'Hostel Applicants',
-              description: 'Review and approve hostel applications.',
-              icon: Icons.fact_check,
-              color: Colors.orangeAccent,
-              badge: 'NEW',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          const HostelApplicantsScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildAdminCard(
-              context,
               title: 'My Profile',
               description: 'Edit your admin account details.',
               icon: Icons.manage_accounts,
@@ -267,6 +250,12 @@ class AdminDashboard extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(context);
               await auth.logout();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
             child: const Text('Logout',
                 style: TextStyle(fontWeight: FontWeight.bold)),

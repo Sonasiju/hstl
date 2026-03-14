@@ -44,7 +44,7 @@ class _SignupScreenState extends State<SignupScreen> {
       email: _emailController.text,
       password: _passwordController.text,
       confirmPassword: _confirmPasswordController.text,
-      role: _selectedRole,
+      role: 'student',
       phone: _phoneController.text.trim(),
     );
 
@@ -174,52 +174,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
-
-                  // Role Selection
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey, width: 1),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _selectedRole,
-                      isExpanded: true,
-                      underline: const SizedBox(),
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      dropdownColor: const Color(0xFF1E293B),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'student',
-                          child: Row(
-                            children: [
-                              Icon(Icons.school, color: Colors.grey, size: 18),
-                              SizedBox(width: 8),
-                              Text('Student'),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'admin',
-                          child: Row(
-                            children: [
-                              Icon(Icons.admin_panel_settings, color: Colors.grey, size: 18),
-                              SizedBox(width: 8),
-                              Text('Admin (Hostel Owner)'),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedRole = value);
-                        }
-                      },
-                    ),
-                  ),
-
                   const SizedBox(height: 16),
                   
                   // Password Field

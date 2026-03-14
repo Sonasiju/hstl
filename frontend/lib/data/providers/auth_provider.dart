@@ -258,6 +258,18 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
 
+    if (phone.trim().isEmpty) {
+      _errorMessage = 'Phone number is required';
+      notifyListeners();
+      return false;
+    }
+
+    if (phone.trim().length != 10 || !RegExp(r'^[0-9]+$').hasMatch(phone.trim())) {
+      _errorMessage = 'Phone must be exactly 10 digits (numbers only)';
+      notifyListeners();
+      return false;
+    }
+
     _isLoading = true;
     notifyListeners();
 

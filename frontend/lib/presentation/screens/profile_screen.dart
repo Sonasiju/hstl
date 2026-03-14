@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import '../../core/api_config.dart';
 import '../../data/providers/auth_provider.dart';
 import 'hostel_details_screen.dart';
-import 'bookings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -113,12 +112,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           label: 'Change Password',
                           color: Colors.blueAccent,
                           onTap: () => _openChangePassword(context, auth),
-                        ),
-                        _ActionTile(
-                          icon: Icons.book_online_outlined,
-                          label: 'Booking History',
-                          color: Colors.green,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingsScreen())),
                         ),
                       ]),
 
@@ -285,6 +278,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFACC15), foregroundColor: Colors.black, minimumSize: const Size(double.infinity, 50)),
                 onPressed: () async {
+                  if (nameCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(outerCtx).showSnackBar(const SnackBar(
+                      content: Text('Name cannot be empty'),
+                      backgroundColor: Colors.red,
+                    ));
+                    return;
+                  }
+
+                  final phone = phoneCtrl.text.trim();
+                  if (phone.isNotEmpty) {
+                    if (phone.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(phone)) {
+                      ScaffoldMessenger.of(outerCtx).showSnackBar(const SnackBar(
+                        content: Text('Phone must be exactly 10 digits'),
+                        backgroundColor: Colors.red,
+                      ));
+                      return;
+                    }
+                  }
+
                   final success = await auth.updateProfile(name: nameCtrl.text, phone: phoneCtrl.text);
                   if (outerCtx.mounted) {
                     Navigator.pop(ctx);
