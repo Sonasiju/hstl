@@ -7,7 +7,8 @@ const getHostels = async (req, res) => {
   try {
     const { lat, lng, maxDistance, priceMin, priceMax, type, limit, city, search } = req.query;
 
-    let query = { isActive: true }; // Only show approved/active hostels
+    // Show all hostels as requested for the Discover page
+    let query = {};
 
     if (type) query.type = type;
 
@@ -40,22 +41,24 @@ const getHostels = async (req, res) => {
       const userLng = parseFloat(lng);
       const maxDist = maxDistance ? Number(maxDistance) : 10; // km
 
-      // Calculate distance and filter
+      // Calculate distance but DO NOT filter by maxDist for database hostels
       const withDist = allHostels.map(h => {
-        if (!h.location) return null;
+        if (!h.location || h.location.lat == null || h.location.lng == null) {
+          return { hostel: h, dist: 99999 };
+        }
         const dLat = (h.location.lat - userLat) * Math.PI / 180;
         const dLng = (h.location.lng - userLng) * Math.PI / 180;
         const a = Math.sin(dLat/2)**2 +
           Math.cos(userLat * Math.PI/180) * Math.cos(h.location.lat * Math.PI/180) * Math.sin(dLng/2)**2;
         const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // km
         return { hostel: h, dist };
-      }).filter(x => x !== null && x.dist <= maxDist);
+      });
 
       withDist.sort((a, b) => a.dist - b.dist);
 
-      // If no results within range, return all without geo filter
+      // If no results at all, fallback
       if (withDist.length === 0) {
-        const fallback = await Hostel.find({ isActive: true }).limit(Number(limit) || 50);
+        const fallback = await Hostel.find({}).limit(Number(limit) || 50);
         return res.json(fallback);
       }
 

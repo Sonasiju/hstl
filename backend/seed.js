@@ -17,13 +17,13 @@ const importData = async () => {
       {
         name: 'Admin User',
         email: 'admin@hostel.com',
-        password: 'password123', // In real system, this will be hashed via prev hook, but seed bypasses save unless manually managed. Let's rely on simple seed for now.
+        password: 'Password@123', // In real system, this will be hashed via prev hook, but seed bypasses save unless manually managed. Let's rely on simple seed for now.
         role: 'admin'
       },
       {
         name: 'Test Student',
         email: 'student@test.com',
-        password: 'password123',
+        password: 'Password@123',
         role: 'student'
       }
     ]);
@@ -42,6 +42,8 @@ const importData = async () => {
         rentPerMonth: 5000,
         facilities: ['WiFi', 'Food', 'Laundry'],
         type: 'boys',
+        city: 'Bangalore',
+        phone: '1234567890',
         totalRooms: 50,
         availableRooms: 20,
         adminId: adminUser,
@@ -58,6 +60,8 @@ const importData = async () => {
         rentPerMonth: 6500,
         facilities: ['AC', 'WiFi', 'Food', 'Security'],
         type: 'girls',
+        city: 'Bangalore',
+        phone: '0987654321',
         totalRooms: 30,
         availableRooms: 5,
         adminId: adminUser,

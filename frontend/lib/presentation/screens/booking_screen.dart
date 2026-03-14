@@ -63,6 +63,12 @@ class _BookingScreenState extends State<BookingScreen> {
       _showSnack('Cannot book: hostel ID is missing.', isError: true);
       return;
     }
+    
+    // Check if it's an OSM or mock hostel
+    if (_hostelId.startsWith('osm_') || !RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(_hostelId)) {
+      _showSnack('This is a demonstration or OSM hostel and cannot be booked.', isError: true);
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 

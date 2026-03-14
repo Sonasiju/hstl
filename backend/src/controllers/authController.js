@@ -57,7 +57,7 @@ const validateEmail = (email) => {
 // @route   POST /api/auth/signup
 // @access  Public
 const registerUser = async (req, res) => {
-  const { name, email, password, role, phone, hostelName, address } = req.body;
+  const { name, email, password, phone, role = 'student' } = req.body;
 
   try {
     // --- Input validation ---
@@ -67,6 +67,10 @@ const registerUser = async (req, res) => {
 
     if (!email || !validateEmail(email)) {
       return res.status(400).json({ message: 'Please provide a valid email address.' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required.' });
     }
 
     const passwordErrors = validatePassword(password);
@@ -88,7 +92,7 @@ const registerUser = async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role: role || 'student',
+      role,
       phone: phone || '',
     });
 
@@ -105,8 +109,9 @@ const registerUser = async (req, res) => {
       res.status(400).json({ message: 'Invalid user data. Please try again.' });
     }
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error. Please try again later.' });
+    console.error('Registration error:', error.message);
+    console.error('Error details:', error);
+    res.status(500).json({ message: 'Server error. Please try again later.', error: error.message });
   }
 };
 

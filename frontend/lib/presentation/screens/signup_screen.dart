@@ -178,28 +178,48 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   // Role Selection
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey, width: 1),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedRole,
-                        dropdownColor: const Color(0xFF1E293B),
-                        style: const TextStyle(color: Colors.white),
-                        icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(value: 'student', child: Text('I am a Resident / Guest')),
-                          DropdownMenuItem(value: 'admin', child: Text('I am a Warden / Admin')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) setState(() => _selectedRole = value);
-                        },
-                      ),
+                    child: DropdownButton<String>(
+                      value: _selectedRole,
+                      isExpanded: true,
+                      underline: const SizedBox(),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      dropdownColor: const Color(0xFF1E293B),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'student',
+                          child: Row(
+                            children: [
+                              Icon(Icons.school, color: Colors.grey, size: 18),
+                              SizedBox(width: 8),
+                              Text('Student'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'admin',
+                          child: Row(
+                            children: [
+                              Icon(Icons.admin_panel_settings, color: Colors.grey, size: 18),
+                              SizedBox(width: 8),
+                              Text('Admin (Hostel Owner)'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedRole = value);
+                        }
+                      },
                     ),
                   ),
+
                   const SizedBox(height: 16),
                   
                   // Password Field

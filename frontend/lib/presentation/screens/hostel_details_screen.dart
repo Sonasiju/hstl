@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import '../../core/api_config.dart';
 import '../../data/providers/auth_provider.dart';
+import 'booking_screen.dart';
 
 class HostelDetailsScreen extends StatefulWidget {
   final dynamic hostel;
@@ -39,6 +40,13 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
     }
   }
 
+  /// Check if ID is a valid MongoDB ObjectId (24 hex characters)
+  bool _isValidMongoObjectId(String id) {
+    // MongoDB ObjectIds are 24 hexadecimal characters
+    final mongoIdRegex = RegExp(r'^[a-f0-9]{24}$', caseSensitive: false);
+    return mongoIdRegex.hasMatch(id);
+  }
+
   // ──────────────────────────── BOOKING ────────────────────────────
 
   Future<void> _handleBooking() async {
@@ -64,176 +72,22 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
       return;
     }
 
-    // Show booking form dialog
-    final guestNameCtrl = TextEditingController(text: auth.userName ?? '');
-    final contactCtrl = TextEditingController(text: auth.userPhone ?? '');
-    final messageCtrl = TextEditingController();
-    String selectedRoom = 'Standard';
-    int durationMonths = 1;
+    // Check if this is a sample hostel (simple numeric ID - not a real MongoDB ObjectId)
+    // Real MongoDB ObjectIds are 24 hex characters
+    if (!_isValidMongoObjectId(hostelId)) {
+      _showSnack(
+        'This is a demonstration hostel. Please refresh the app to load real hostels from the database.',
+        isError: true
+      );
+      return;
+    }
 
-    final confirm = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Book a Stay',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: StatefulBuilder(
-          builder: (context, setState) => SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: guestNameCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Full Name',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: contactCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Contact Number',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedRoom,
-                  dropdownColor: const Color(0xFF0F172A),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Room Type',
-                    labelStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: ['Standard', 'Deluxe', 'Premium']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(color: Colors.white))))
-                      .toList(),
-                  onChanged: (val) => setState(() => selectedRoom = val ?? 'Standard'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Expanded(child: Text('Duration:', style: TextStyle(color: Colors.grey))),
-                    IconButton(
-                      onPressed: () => setState(() => durationMonths = (durationMonths - 1).clamp(1, 12)),
-                      icon: const Icon(Icons.remove, color: Color(0xFFFACC15)),
-                    ),
-                    Text('$durationMonths month${durationMonths > 1 ? 's' : ''}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    IconButton(
-                      onPressed: () => setState(() => durationMonths = (durationMonths + 1).clamp(1, 12)),
-                      icon: const Icon(Icons.add, color: Color(0xFFFACC15)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: messageCtrl,
-                  style: const TextStyle(color: Colors.white),
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Additional Message (optional)',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFACC15),
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(
-              context,
-              {
-                'guestName': guestNameCtrl.text,
-                'contactNumber': contactCtrl.text,
-                'roomType': selectedRoom,
-                'durationInMonths': durationMonths,
-                'message': messageCtrl.text,
-              },
-            ),
-            child: const Text('Submit Booking', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingScreen(hostel: widget.hostel),
       ),
     );
-
-    if (confirm == null) return;
-
-    setState(() => _isBooking = true);
-
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.getConfiguredUrl()}/api/bookings'),
-        headers: {
-          'Authorization': 'Bearer ${auth.token}',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'hostelId': hostelId,
-          'guestName': confirm['guestName'],
-          'contactNumber': confirm['contactNumber'],
-          'roomType': confirm['roomType'],
-          'durationInMonths': confirm['durationInMonths'],
-          'message': confirm['message'],
-        }),
-      ).timeout(const Duration(seconds: 10));
-
-      if (mounted) {
-        if (response.statusCode == 201) {
-          _showSnack('✅ Booking request sent! The hostel will contact you soon.');
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) Navigator.pop(context);
-          });
-        } else {
-          final errorData = json.decode(response.body);
-          _showSnack(errorData['message'] ?? 'Booking failed', isError: true);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        _showSnack('Error: ${e.toString().split('\n').first}', isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isBooking = false);
-    }
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -251,9 +105,11 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final hostel = widget.hostel;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
 
     final isOsm = (hostel['source'] ?? '').toString() == 'osm' || 
                   (hostel['_id'] ?? '').toString().startsWith('osm_');
+    final isAdmin = auth.userRole == 'admin';
 
     final List<String> images = (hostel['images'] != null &&
             (hostel['images'] as List).isNotEmpty)
@@ -670,25 +526,53 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
                   )
                 else
                   Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFACC15),
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: _isBooking ? null : _handleBooking,
-                      child: _isBooking
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.black),
-                            )
-                          : const Text('Book Now',
-                              style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (isAdmin)
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.orange),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Admin accounts cannot book hostels.',
+                                    style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isAdmin ? Colors.grey : const Color(0xFFFACC15),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: (isAdmin || _isBooking) ? null : _handleBooking,
+                          child: _isBooking
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.black),
+                                )
+                              : Text(isAdmin ? 'Booking Disabled for Admins' : 'Book Now',
+                                  style: const TextStyle(
+                                      fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                   ),
               ],

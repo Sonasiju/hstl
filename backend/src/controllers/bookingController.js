@@ -9,6 +9,16 @@ const createBooking = async (req, res) => {
   const { hostelId, guestName, contactNumber, roomType, durationInMonths, message } = req.body;
 
   try {
+    // Admin users are not allowed to create bookings
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ message: 'Admins cannot create bookings. Only regular users can book hostels.' });
+    }
+
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(hostelId)) {
+      return res.status(400).json({ message: 'Invalid hostel ID format' });
+    }
+
     const hostel = await Hostel.findById(hostelId);
 
     if (!hostel) {

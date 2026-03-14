@@ -43,16 +43,25 @@ class HostelProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _hostels = List<Map<String, dynamic>>.from(data);
-        debugPrint('Backend hostels fetched: ${_hostels.length}');
+        final List<dynamic> rawData = data is List ? data : [];
+        _hostels = rawData.map<Map<String, dynamic>>((hostel) {
+          final h = hostel as Map<String, dynamic>;
+          // Ensure location is properly structured
+          if (h['location'] == null) {
+            h['location'] = {'lat': 0.0, 'lng': 0.0};
+          }
+          // Add source field to distinguish from OSM hostels
+          return {...h, 'source': 'database'};
+        }).toList();
+        debugPrint('✓ Backend hostels fetched: ${_hostels.length}');
       } else {
-        debugPrint('Backend hostels error: ${response.statusCode}');
-        if (_hostels.isEmpty) _hostels = _getSampleHostels();
+        debugPrint('✗ Backend hostels error: ${response.statusCode} - ${response.body}');
+        _hostels = _getSampleHostels();
       }
     } catch (e) {
       debugPrint('Error fetching hostels: $e');
       _lastError = e.toString();
-      if (_hostels.isEmpty) _hostels = _getSampleHostels();
+      _hostels = _getSampleHostels();
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -73,10 +82,19 @@ class HostelProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _hostels = List<Map<String, dynamic>>.from(data);
-        debugPrint('Text search hostels fetched: ${_hostels.length}');
+        final List<dynamic> rawData = data is List ? data : [];
+        _hostels = rawData.map<Map<String, dynamic>>((hostel) {
+          final h = hostel as Map<String, dynamic>;
+          // Ensure location is properly structured
+          if (h['location'] == null) {
+            h['location'] = {'lat': 0.0, 'lng': 0.0};
+          }
+          // Add source field to distinguish from OSM hostels
+          return {...h, 'source': 'database'};
+        }).toList();
+        debugPrint('✓ Text search hostels fetched: ${_hostels.length}');
       } else {
-        debugPrint('Text search error: ${response.statusCode}');
+        debugPrint('✗ Text search error: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('Error in text search: $e');
@@ -116,10 +134,20 @@ class HostelProvider with ChangeNotifier {
       // Run both in parallel
       await Future.wait([
         fetchHostels(lat: lat, lng: lng, radiusKm: radiusKm)
-            .catchError((e) => debugPrint('Backend area fetch error: $e')),
+            .catchError((e) {
+              debugPrint('✗ Backend area fetch error: $e');
+              // On error, use sample hostels as fallback
+              if (_hostels.isEmpty) _hostels = _getSampleHostels();
+              return;
+            }),
         findNearbyOSMHostels(lat, lng, radiusMeters: radiusKm * 1000)
-            .catchError((e) => debugPrint('OSM area fetch error: $e')),
+            .catchError((e) {
+              debugPrint('✗ OSM area fetch error: $e');
+              return;
+            }),
       ]);
+      
+      debugPrint('✓ Total hostels available: DB=${_hostels.length}, OSM=${_osmHostels.length}');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -163,17 +191,32 @@ class HostelProvider with ChangeNotifier {
     final combined = <Map<String, dynamic>>[];
     final seen = <String>{};
 
+    // Always ensure we have sample hostels as fallback
+    final dbHostels = _hostels.isNotEmpty ? _hostels : _getSampleHostels();
+    
+    debugPrint('DEBUG: getNearbyHostels - DB=${dbHostels.length}, OSM=${_osmHostels.length}');
+
     // Add backend hostels first (bookable)
-    for (final h in _hostels) {
+    for (final h in dbHostels) {
       final id = h['_id']?.toString() ?? '';
       if (id.isNotEmpty && !seen.contains(id)) {
         seen.add(id);
-        if (h['location'] != null) {
-          final lat = (h['location']['lat'] as num).toDouble();
-          final lng = (h['location']['lng'] as num).toDouble();
-          final dist = _locationService.calculateDistance(userLat, userLng, lat, lng);
-          combined.add({...h, 'distance': dist});
-        } else {
+        try {
+          if (h['location'] != null && h['location'] is Map) {
+            final Map locMap = h['location'] as Map;
+            final lat = (locMap['lat'] as num?)?.toDouble() ?? 0.0;
+            final lng = (locMap['lng'] as num?)?.toDouble() ?? 0.0;
+            if (lat != 0.0 && lng != 0.0) {
+              final dist = _locationService.calculateDistance(userLat, userLng, lat, lng);
+              combined.add({...h, 'distance': dist});
+            } else {
+              combined.add({...h, 'distance': 9999.0});
+            }
+          } else {
+            combined.add({...h, 'distance': 9999.0});
+          }
+        } catch (e) {
+          debugPrint('Error processing hostel ${h['name']}: $e');
           combined.add({...h, 'distance': 9999.0});
         }
       }
@@ -184,17 +227,26 @@ class HostelProvider with ChangeNotifier {
       final id = h['_id']?.toString() ?? '';
       if (id.isNotEmpty && !seen.contains(id)) {
         seen.add(id);
-        if (h['location'] != null) {
-          final lat = (h['location']['lat'] as num).toDouble();
-          final lng = (h['location']['lng'] as num).toDouble();
-          final dist = _locationService.calculateDistance(userLat, userLng, lat, lng);
-          combined.add({...h, 'distance': dist});
+        try {
+          if (h['location'] != null && h['location'] is Map) {
+            final Map locMap = h['location'] as Map;
+            final lat = (locMap['lat'] as num?)?.toDouble() ?? 0.0;
+            final lng = (locMap['lng'] as num?)?.toDouble() ?? 0.0;
+            if (lat != 0.0 && lng != 0.0) {
+              final dist = _locationService.calculateDistance(userLat, userLng, lat, lng);
+              combined.add({...h, 'distance': dist});
+            }
+          }
+        } catch (e) {
+          debugPrint('Error processing OSM hostel ${h['name']}: $e');
         }
       }
     }
 
     combined.sort((a, b) =>
         (a['distance'] as double).compareTo(b['distance'] as double));
+    
+    debugPrint('DEBUG: getNearbyHostels result count = ${combined.length}');
     return combined;
   }
 
@@ -233,6 +285,7 @@ class HostelProvider with ChangeNotifier {
         "images": ["https://images.unsplash.com/photo-1555854877-bab0e564b8d5"],
         "location": {"lat": 12.9715987, "lng": 77.5945627},
         "type": "boys",
+        "source": "database",
       },
       {
         "_id": "2",
@@ -248,6 +301,7 @@ class HostelProvider with ChangeNotifier {
         "images": ["https://images.unsplash.com/photo-1522771731478-4ea767a14a24"],
         "location": {"lat": 12.9352733, "lng": 77.6244546},
         "type": "girls",
+        "source": "database",
       }
     ];
   }

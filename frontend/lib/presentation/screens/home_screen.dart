@@ -6,8 +6,8 @@ import 'package:http/http.dart' as http;
 import '../../data/providers/hostel_provider.dart';
 import '../../data/providers/auth_provider.dart';
 import '../../data/services/location_service.dart';
-import 'hostel_details_screen.dart';
 import 'booking_screen.dart';
+import 'hostel_details_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -102,10 +102,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void _buildHostelListFrom(HostelProvider provider,
       {double? lat, double? lng}) {
     List<dynamic> combined;
+    debugPrint('DEBUG _buildHostelListFrom: lat=$lat, lng=$lng');
+    
     if (lat != null && lng != null) {
       combined = provider.getNearbyHostels(lat, lng);
     } else {
-      combined = [...provider.hostels, ...provider.osmHostels];
+      // Combine all available hostels when no location specified
+      final allDb = provider.hostels;
+      final allOsm = provider.osmHostels;
+      combined = [...allDb, ...allOsm];
+      debugPrint('DEBUG: Combined ${allDb.length} DB + ${allOsm.length} OSM = ${combined.length} total');
     }
 
     if (mounted) {
@@ -113,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _allHostels = combined;
         _isLoadingHostels = false;
       });
+      debugPrint('DEBUG: _allHostels set to ${_allHostels.length} hostels');
       _applyFilters();
     }
   }
@@ -223,7 +230,18 @@ class _HomeScreenState extends State<HomeScreen> {
           matchesType = type == _selectedType.toLowerCase();
         }
 
-        return matchesSearch && matchesType;
+        bool matchesDistance = true;
+        // Enforce 10km filter only on OSM hostels. Database hostels bypass this.
+        final source = h['source']?.toString() ?? '';
+        final isOsm = source == 'osm' || (h['_id']?.toString().startsWith('osm_') == true);
+        if (isOsm) {
+          final dist = h['distance'] as double?;
+          if (dist != null && dist > 10.0) {
+            matchesDistance = false;
+          }
+        }
+
+        return matchesSearch && matchesType && matchesDistance;
       }).toList();
     });
   }

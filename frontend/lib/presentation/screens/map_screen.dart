@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../../data/services/location_service.dart';
 import '../../data/providers/hostel_provider.dart';
 import 'hostel_details_screen.dart';
+import 'booking_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({Key? key}) : super(key: key);
@@ -101,12 +102,20 @@ class _MapScreenState extends State<MapScreen> {
     if (_currentPosition == null) return;
     final hostelProvider =
         Provider.of<HostelProvider>(context, listen: false);
+    
+    debugPrint('MAP: Refreshing hostels at ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+    
     // Fetch both backend and OSM hostels in parallel
     await hostelProvider.fetchHostelsForArea(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
       radiusKm: 10,
     );
+    
+    if (mounted) {
+      debugPrint('MAP: Refresh complete. DB=${hostelProvider.hostels.length}, OSM=${hostelProvider.osmHostels.length}');
+      setState(() {}); // Trigger UI rebuild
+    }
   }
 
   void _goToMyLocation() {
@@ -192,17 +201,32 @@ class _MapScreenState extends State<MapScreen> {
             _currentPosition!.latitude, _currentPosition!.longitude)
         : [...hostelProvider.hostels, ...hostelProvider.osmHostels];
 
+    debugPrint('MAP BUILD: Total hostels = ${nearbyHostels.length} (DB=${hostelProvider.hostels.length}, OSM=${hostelProvider.osmHostels.length})');
+
     // Apply type filter
     final filteredHostels = nearbyHostels.where((h) {
       final type = (h['type'] ?? '').toString().toLowerCase();
+      bool typeMatch = true;
       if (_selectedType == 'Men & Boys') {
-        return type == 'boys' || type == 'men' || type == 'mens';
+        typeMatch = type == 'boys' || type == 'men' || type == 'mens';
       } else if (_selectedType == 'Girls & Women') {
-        return type == 'girls' || type == 'women' || type == 'womens';
+        typeMatch = type == 'girls' || type == 'women' || type == 'womens';
       } else if (_selectedType != 'Any Share') {
-        return type == _selectedType.toLowerCase();
+        typeMatch = type == _selectedType.toLowerCase();
       }
-      return true;
+      
+      // Enforce the 10km distance filter only on OSM hostels. Database hostels are always shown.
+      bool distMatch = true;
+      final source = h['source']?.toString() ?? '';
+      final isOsm = source == 'osm' || (h['_id']?.toString().startsWith('osm_') == true);
+      if (isOsm) {
+        final dist = h['distance'] as double?;
+        if (dist != null && dist > 10.0) {
+          distMatch = false; // Exclude distant OSM hostels
+        }
+      }
+      
+      return typeMatch && distMatch;
     }).toList();
 
     return Scaffold(
@@ -541,6 +565,13 @@ class _MapScreenState extends State<MapScreen> {
               final isSelected = _selectedHostel != null &&
                   (_selectedHostel!['_id'] == hostel['_id'] ||
                       _selectedHostel!['id'] == hostel['id']);
+              
+              // Determine marker color based on source
+              final source = hostel['source']?.toString() ?? '';
+              final isDatabase = source == 'database' || (hostel['_id']?.toString().startsWith('osm_') != true);
+              final markerColor = isDatabase 
+                  ? const Color(0xFF10B981)  // Green for database hostels
+                  : const Color(0xFF3B82F6); // Blue for OSM hostels
 
               return Marker(
                 point: LatLng(
@@ -563,15 +594,15 @@ class _MapScreenState extends State<MapScreen> {
                         horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFFFACC15)
+                          ? markerColor
                           : const Color(0xFF1E293B),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: const Color(0xFFFACC15),
+                          color: markerColor,
                           width: isSelected ? 0 : 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFACC15)
+                          color: markerColor
                               .withOpacity(isSelected ? 0.5 : 0.2),
                           blurRadius: isSelected ? 12 : 4,
                         )
@@ -580,10 +611,10 @@ class _MapScreenState extends State<MapScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.hotel,
+                        Icon(isDatabase ? Icons.location_city : Icons.map,
                             color: isSelected
-                                ? Colors.black
-                                : const Color(0xFFFACC15),
+                                ? Colors.white
+                                : markerColor,
                             size: 14),
                         const SizedBox(width: 4),
                         Flexible(
@@ -591,7 +622,7 @@ class _MapScreenState extends State<MapScreen> {
                             hostel['name']?.toString() ?? 'Hostel',
                             style: TextStyle(
                               color: isSelected
-                                  ? Colors.black
+                                  ? Colors.white
                                   : Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -619,6 +650,10 @@ class _MapScreenState extends State<MapScreen> {
     final email = hostel['email']?.toString();
     final type = hostel['type']?.toString();
     final city = hostel['city']?.toString() ?? hostel['address']?.toString() ?? '';
+    
+    // Determine if this is a database or OSM hostel
+    final source = hostel['source']?.toString() ?? '';
+    final isDatabase = source == 'database' || (hostel['_id']?.toString().startsWith('osm_') != true);
 
     return Container(
       decoration: const BoxDecoration(
@@ -645,6 +680,43 @@ class _MapScreenState extends State<MapScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Source badge
+                if (!isDatabase)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.map, color: Colors.blueAccent, size: 12),
+                        SizedBox(width: 4),
+                        Text('OpenStreetMap', style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified, color: Colors.green, size: 12),
+                        SizedBox(width: 4),
+                        Text('Registered Hostel', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
                 Row(
                   children: [
                     Expanded(
@@ -690,12 +762,12 @@ class _MapScreenState extends State<MapScreen> {
                 // Stats row
                 Row(
                   children: [
-                    if (hostel['rentPerMonth'] != null)
+                    if (isDatabase && hostel['rentPerMonth'] != null)
                       _buildChip(
                           '₹${hostel['rentPerMonth']}/mo',
-                          const Color(0xFFFACC15),
-                          Colors.black),
-                    const SizedBox(width: 8),
+                          const Color(0xFF10B981),
+                          Colors.white),
+                    if (isDatabase) const SizedBox(width: 8),
                     if (type != null)
                       _buildChip(type.toUpperCase(), Colors.blueAccent, Colors.white),
                     const SizedBox(width: 8),
@@ -738,27 +810,50 @@ class _MapScreenState extends State<MapScreen> {
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFACC15),
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              HostelDetailsScreen(hostel: hostel),
+                  child: isDatabase
+                      ? ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    BookingScreen(hostel: hostel),
+                              ),
+                            );
+                          },
+                          child: const Text('Book Visit',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15)),
+                        )
+                      : ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.info_outline, size: 18),
+                          label: const Text('View Details',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15)),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    HostelDetailsScreen(hostel: hostel),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                    child: const Text('View Full Details',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                  ),
                 ),
               ],
             ),
