@@ -7,6 +7,8 @@ const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
 const hostelRoutes = require('./src/routes/hostelRoutes');
 const bookingRoutes = require('./src/routes/bookingRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
+const hostelApplicationRoutes = require('./src/routes/hostelApplicationRoutes');
 
 const app = express();
 
@@ -21,6 +23,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/hostels', hostelRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/hostel-applications', hostelApplicationRoutes);
 
 app.get('/', (req, res) => {
   res.send('Hostel Management API is running...');

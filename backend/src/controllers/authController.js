@@ -163,6 +163,7 @@ const getMe = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      phone: user.phone || '',
     });
   } catch (error) {
     console.error('GetMe error:', error);
@@ -170,4 +171,45 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getMe };
+// @desc    Update user profile (name, phone)
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (req.body.name) user.name = req.body.name.trim();
+    if (req.body.phone !== undefined) user.phone = req.body.phone.trim();
+
+    const updated = await user.save();
+    res.json({ _id: updated._id, name: updated.name, email: updated.email, role: updated.role, phone: updated.phone });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+
+    const errors = validatePassword(newPassword);
+    if (errors.length > 0) return res.status(400).json({ message: errors[0] });
+
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { registerUser, loginUser, getMe, updateProfile, changePassword };

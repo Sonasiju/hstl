@@ -1,13 +1,18 @@
 const express = require('express');
-const { createBooking, getMyBookings } = require('../controllers/bookingController');
-const { protect } = require('../middlewares/authMiddleware');
+const { createBooking, getMyBookings, getAdminBookings, updateBookingStatus } = require('../controllers/bookingController');
+const { protect, admin } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.route('/')
-  .post(protect, createBooking);
+// More specific routes BEFORE generic ones
+// Admin routes (specific)
+router.get('/admin', protect, admin, getAdminBookings);
 
-router.route('/mybookings')
-  .get(protect, getMyBookings);
+// User routes
+router.get('/mybookings', protect, getMyBookings);
+router.post('/', protect, createBooking);
+
+// Generic routes (specific parameter routes after named routes)
+router.put('/:id/status', protect, admin, updateBookingStatus);
 
 module.exports = router;

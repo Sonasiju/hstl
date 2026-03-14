@@ -1,48 +1,82 @@
 const Hostel = require('../models/Hostel');
 
-// @desc    Get all hostels with optional filtering and distance
+// @desc    Get all hostels (public, with optional filters)
 // @route   GET /api/hostels
 // @access  Public
 const getHostels = async (req, res) => {
   try {
-    const { lat, lng, maxDistance, priceMin, priceMax, type, limit } = req.query;
+    const { lat, lng, maxDistance, priceMin, priceMax, type, limit, city, search } = req.query;
 
-    let query = {};
+    let query = { isActive: true }; // Only show approved/active hostels
 
-    // Filter by type (boys, girls, coed)
-    if (type) {
-      query.type = type;
+    if (type) query.type = type;
+
+    // City or area text search
+    if (city && city.trim()) {
+      query.city = { $regex: city.trim(), $options: 'i' };
+    }
+    if (search && search.trim()) {
+      query.$or = [
+        { name: { $regex: search.trim(), $options: 'i' } },
+        { city: { $regex: search.trim(), $options: 'i' } },
+        { address: { $regex: search.trim(), $options: 'i' } },
+        { description: { $regex: search.trim(), $options: 'i' } },
+      ];
     }
 
-    // Filter by price
     if (priceMin || priceMax) {
       query.rentPerMonth = {};
       if (priceMin) query.rentPerMonth.$gte = Number(priceMin);
       if (priceMax) query.rentPerMonth.$lte = Number(priceMax);
     }
 
-    // Geospatial search if lat and lng provided
     if (lat && lng) {
-      query.location = {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(lng), parseFloat(lat)]
-          },
-          // Convert maxDistance from km to meters (default 10km)
-          $maxDistance: maxDistance ? Number(maxDistance) * 1000 : 10000
-        }
-      };
+      // Use $near for geospatial search (requires 2dsphere index on location.coordinates)
+      // Since location is stored as {lat, lng} flat (not GeoJSON), we fall back to in-memory sort
+      // Just fetch all matching and sort by distance in JS
+      const allHostels = await Hostel.find(query).limit(Number(limit) || 100);
+      
+      const userLat = parseFloat(lat);
+      const userLng = parseFloat(lng);
+      const maxDist = maxDistance ? Number(maxDistance) : 10; // km
+
+      // Calculate distance and filter
+      const withDist = allHostels.map(h => {
+        if (!h.location) return null;
+        const dLat = (h.location.lat - userLat) * Math.PI / 180;
+        const dLng = (h.location.lng - userLng) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 +
+          Math.cos(userLat * Math.PI/180) * Math.cos(h.location.lat * Math.PI/180) * Math.sin(dLng/2)**2;
+        const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); // km
+        return { hostel: h, dist };
+      }).filter(x => x !== null && x.dist <= maxDist);
+
+      withDist.sort((a, b) => a.dist - b.dist);
+
+      // If no results within range, return all without geo filter
+      if (withDist.length === 0) {
+        const fallback = await Hostel.find({ isActive: true }).limit(Number(limit) || 50);
+        return res.json(fallback);
+      }
+
+      return res.json(withDist.map(x => ({ ...x.hostel.toObject(), distance: x.dist })));
     }
 
-    let hostels = await Hostel.find(query).limit(Number(limit) || 20);
+    const hostels = await Hostel.find(query).limit(Number(limit) || 50);
+    res.json(hostels);
+  } catch (error) {
+    console.error('getHostels error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
 
-    // If no results, try without geo query just to show something
-    if (hostels.length === 0 && query.location) {
-      delete query.location;
-      hostels = await Hostel.find(query).limit(Number(limit) || 20);
-    }
 
+// @desc    Get hostels belonging to the logged-in admin
+// @route   GET /api/hostels/my
+// @access  Private/Admin
+const getMyHostels = async (req, res) => {
+  try {
+    const hostels = await Hostel.find({ adminId: req.user._id });
     res.json(hostels);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -70,19 +104,22 @@ const getHostelById = async (req, res) => {
 // @access  Private/Admin
 const createHostel = async (req, res) => {
   try {
-    const { name, description, address, location, rentPerMonth, facilities, type, totalRooms } = req.body;
-    
+    const { name, description, address, city, phone, location, rentPerMonth, pricePerNight, facilities, type, totalRooms } = req.body;
+
     const hostel = new Hostel({
       adminId: req.user._id,
       name,
       description,
       address,
+      city,
+      phone,
       location,
-      rentPerMonth,
+      rentPerMonth: rentPerMonth || pricePerNight * 30,
+      pricePerNight: pricePerNight || rentPerMonth / 30,
       facilities,
-      type,
+      type: type || 'coed',
       totalRooms,
-      availableRooms: totalRooms, // initially all rooms available
+      availableRooms: totalRooms,
     });
 
     const createdHostel = await hostel.save();
@@ -92,4 +129,47 @@ const createHostel = async (req, res) => {
   }
 };
 
-module.exports = { getHostels, getHostelById, createHostel };
+// @desc    Delete a hostel (Admin only – must own the hostel)
+// @route   DELETE /api/hostels/:id
+// @access  Private/Admin
+const deleteHostel = async (req, res) => {
+  try {
+    const hostel = await Hostel.findById(req.params.id);
+
+    if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
+
+    if (hostel.adminId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to delete this hostel' });
+    }
+
+    await hostel.deleteOne();
+    res.json({ message: 'Hostel removed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update a hostel (Admin only – must own the hostel)
+// @route   PUT /api/hostels/:id
+// @access  Private/Admin
+const updateHostel = async (req, res) => {
+  try {
+    const hostel = await Hostel.findById(req.params.id);
+
+    if (!hostel) return res.status(404).json({ message: 'Hostel not found' });
+
+    if (hostel.adminId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to edit this hostel' });
+    }
+
+    const fields = ['name', 'description', 'address', 'city', 'phone', 'rentPerMonth', 'facilities', 'type', 'totalRooms', 'availableRooms'];
+    fields.forEach(f => { if (req.body[f] !== undefined) hostel[f] = req.body[f]; });
+
+    const updated = await hostel.save();
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { getHostels, getMyHostels, getHostelById, createHostel, deleteHostel, updateHostel };

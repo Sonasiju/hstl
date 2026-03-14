@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'presentation/screens/login_screen.dart';
-import 'presentation/screens/main_layout.dart';
-import 'data/providers/hostel_provider.dart';
+import 'presentation/screens/user_dashboard.dart';
+import 'presentation/screens/admin_dashboard.dart';
+
 import 'data/providers/auth_provider.dart';
+import 'data/providers/hostel_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => HostelProvider()),
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
+        ),
+        ChangeNotifierProvider<HostelProvider>(
+          create: (_) => HostelProvider(),
+        ),
       ],
       child: const HostelApp(),
     ),
@@ -19,27 +27,31 @@ void main() {
 }
 
 class HostelApp extends StatelessWidget {
-  const HostelApp({Key? key}) : super(key: key);
+  const HostelApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'HostelHub',
       debugShowCheckedModeBanner: false,
+
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         primaryColor: const Color(0xFFFACC15),
-        colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: const Color(0xFFFACC15),
-          secondary: const Color(0xFF10B981),
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFFACC15),
           brightness: Brightness.dark,
         ),
+
         textTheme: const TextTheme(
           bodyMedium: TextStyle(color: Colors.white),
         ),
+
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF0F172A),
           elevation: 0,
+          centerTitle: true,
           titleTextStyle: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -47,37 +59,42 @@ class HostelApp extends StatelessWidget {
           ),
         ),
       ),
+
       home: const AuthWrapper(),
     );
   }
 }
 
 class AuthWrapper extends StatefulWidget {
-  const AuthWrapper({Key? key}) : super(key: key);
+  const AuthWrapper({super.key});
 
   @override
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  bool _isInit = true;
+
   bool _isLoading = true;
 
   @override
-  void didChangeDependencies() {
-    if (_isInit) {
-      Provider.of<AuthProvider>(context, listen: false).tryAutoLogin().then((_) {
-        setState(() {
-          _isLoading = false;
-        });
-      });
-      _isInit = false;
-    }
-    super.didChangeDependencies();
+  void initState() {
+    super.initState();
+    _autoLogin();
+  }
+
+  Future<void> _autoLogin() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    await authProvider.tryAutoLogin();
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+
     if (_isLoading) {
       return const Scaffold(
         body: Center(
@@ -85,29 +102,37 @@ class _AuthWrapperState extends State<AuthWrapper> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'HostelHub',
+                "HostelHub",
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFFFACC15),
                 ),
               ),
-              SizedBox(height: 24),
-              CircularProgressIndicator(color: Color(0xFFFACC15)),
+              SizedBox(height: 20),
+              CircularProgressIndicator(
+                color: Color(0xFFFACC15),
+              ),
             ],
           ),
         ),
       );
     }
 
-    // Use Consumer to react to auth state changes
     return Consumer<AuthProvider>(
-      builder: (ctx, auth, _) {
+      builder: (context, auth, child) {
+
         if (auth.isAuthenticated) {
-          return const MainLayout();
-        } else {
-          return const LoginScreen();
+
+          /// ROLE BASED DASHBOARD
+          if (auth.userRole == "admin") {
+            return const AdminDashboard();
+          }
+
+          return const UserDashboard();
         }
+
+        return const LoginScreen();
       },
     );
   }

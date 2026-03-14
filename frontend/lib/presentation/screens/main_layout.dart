@@ -44,11 +44,12 @@ class _MainLayoutState extends State<MainLayout> {
         onTap: (index) {
           setState(() {
             _currentIndex = index;
-            _visitedTabs.add(index); // Mark tab as visited so it gets built
+            _visitedTabs.add(index);
           });
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF2563EB),
+        backgroundColor: const Color(0xFF1E293B), // Dark nav bar
+        selectedItemColor: const Color(0xFFFACC15), // Gold selection
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),

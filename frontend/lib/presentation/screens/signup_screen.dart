@@ -16,6 +16,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -28,6 +29,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -43,21 +45,20 @@ class _SignupScreenState extends State<SignupScreen> {
       password: _passwordController.text,
       confirmPassword: _confirmPasswordController.text,
       role: _selectedRole,
+      phone: _phoneController.text.trim(),
     );
 
     if (success && mounted) {
-      // Show success message
+      // Go back to login screen with success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Account created successfully!'),
-          backgroundColor: Colors.green,
+          content: Text('✅ Account created! Please log in.'),
+          backgroundColor: Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
         ),
       );
-
-      // Navigate to main layout
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainLayout()),
-      );
+      Navigator.of(context).pop(); // go back to login
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -77,10 +78,7 @@ class _SignupScreenState extends State<SignupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: const BackButton(color: Colors.white),
       ),
       body: SafeArea(
         child: Center(
@@ -157,6 +155,22 @@ class _SignupScreenState extends State<SignupScreen> {
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Email is required';
                       if (!AuthProvider.isValidEmail(value)) return 'Enter a valid email';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Phone Field
+                  _buildTextField(
+                    controller: _phoneController,
+                    label: 'PHONE NUMBER (10 DIGITS)',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    onChanged: (_) => Provider.of<AuthProvider>(context, listen: false).clearError(),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Phone number is required';
+                      if (value.trim().length != 10) return 'Enter exactly 10 digits';
+                      if (!RegExp(r'^[0-9]+$').hasMatch(value)) return 'Enter only numbers';
                       return null;
                     },
                   ),

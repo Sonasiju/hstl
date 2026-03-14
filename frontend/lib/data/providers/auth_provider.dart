@@ -15,6 +15,7 @@ class AuthProvider with ChangeNotifier {
   String? _userName;
   String? _userEmail;
   String? _userRole;
+  String? _userPhone;
   String? _errorMessage;
 
   // ─── GETTERS ───────────────────────────────────────────
@@ -25,6 +26,7 @@ class AuthProvider with ChangeNotifier {
   String? get userName => _userName;
   String? get userEmail => _userEmail;
   String? get userRole => _userRole;
+  String? get userPhone => _userPhone;
   String? get errorMessage => _errorMessage;
 
   // Use dynamic base URL from API config
@@ -94,6 +96,7 @@ class AuthProvider with ChangeNotifier {
         _userName = data['name'];
         _userEmail = data['email'];
         _userRole = data['role'];
+        _userPhone = data['phone'] ?? '';
 
         _isAuthenticated = true;
 
@@ -183,6 +186,7 @@ class AuthProvider with ChangeNotifier {
         _userName = data['name'];
         _userEmail = data['email'];
         _userRole = data['role'];
+        _userPhone = data['phone'];
 
         _isAuthenticated = true;
 
@@ -275,14 +279,8 @@ class AuthProvider with ChangeNotifier {
 
       if (response.statusCode == 201) {
 
-        _token = data['token'];
-        _userId = data['_id'];
-        _userName = data['name'];
-        _userEmail = data['email'];
-        _userRole = data['role'];
-
-        _isAuthenticated = true;
-
+        // Registration successful, but DO NOT log in automatically
+        // The screen will navigate to login after success
         _isLoading = false;
         notifyListeners();
 
@@ -309,6 +307,89 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // ─── UPDATE PROFILE ────────────────────────────────────
+  Future<bool> updateProfile({
+    required String name,
+    required String phone,
+  }) async {
+    _errorMessage = null;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/api/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: json.encode({'name': name.trim(), 'phone': phone.trim()}),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        _userName = data['name'] ?? name;
+        _userPhone = data['phone'] ?? phone;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = data['message'] ?? 'Update failed';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = 'Could not connect to server.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ─── CHANGE PASSWORD ───────────────────────────────────
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _errorMessage = null;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final response = await http.put(
+        Uri.parse('$_baseUrl/api/auth/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: json.encode({
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = data['message'] ?? 'Password change failed';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = 'Could not connect to server.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // ─── LOGOUT ────────────────────────────────────────────
   Future<void> logout() async {
 
@@ -319,6 +400,7 @@ class AuthProvider with ChangeNotifier {
     _userName = null;
     _userEmail = null;
     _userRole = null;
+    _userPhone = null;
 
     _errorMessage = null;
 
