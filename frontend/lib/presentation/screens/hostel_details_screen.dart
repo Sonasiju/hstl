@@ -4,9 +4,11 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import '../../core/api_config.dart';
 import '../../data/providers/auth_provider.dart';
 import 'booking_screen.dart';
+import 'routing_map_screen.dart';
 
 class HostelDetailsScreen extends StatefulWidget {
   final dynamic hostel;
@@ -483,7 +485,7 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
             ),
             child: Row(
               children: [
-                // Price info
+                // Price info or Direct Contact text
                 if (!isOsm)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,8 +511,10 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
                     ),
                   ),
                 if (!isOsm) const SizedBox(width: 20),
-                // Book Now button (only for non-OSM, non-admin users)
+                
+                // Action buttons
                 if (!isOsm)
+                  // For registered hostels: Book Now button
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -538,6 +542,51 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
                               ],
                             ),
                           ),
+                        // Get Directions button
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final double lat = (hostel['location']?['lat'] as num?)?.toDouble() ?? 0.0;
+                            final double lng = (hostel['location']?['lng'] as num?)?.toDouble() ?? 0.0;
+                            
+                            if (lat == 0.0 && lng == 0.0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Hostel location not available'),
+                                  backgroundColor: Colors.redAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              return;
+                            }
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RoutingMapScreen(
+                                  hostelLocation: LatLng(lat, lng),
+                                  hostelName: hostel['name'],
+                                  hostelAddress: hostel['address'],
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: const Color(0xFFFACC15),
+                            side: const BorderSide(color: Color(0xFFFACC15), width: 1),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: const Icon(Icons.directions, size: 18),
+                          label: const Text(
+                            'Get Directions',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Book Now button
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isAdmin ? Colors.grey : const Color(0xFFFACC15),
@@ -559,6 +608,51 @@ class _HostelDetailsScreenState extends State<HostelDetailsScreen> {
                                       fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       ],
+                    ),
+                  )
+                else
+                  // For OSM hostels: Open in Maps button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        final double lat = (hostel['location']?['lat'] as num?)?.toDouble() ?? 0.0;
+                        final double lng = (hostel['location']?['lng'] as num?)?.toDouble() ?? 0.0;
+                        
+                        if (lat == 0.0 && lng == 0.0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Hostel location not available'),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RoutingMapScreen(
+                              hostelLocation: LatLng(lat, lng),
+                              hostelName: hostel['name'],
+                              hostelAddress: hostel['address'],
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.map, size: 20),
+                      label: const Text(
+                        'Open in Maps',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
               ],

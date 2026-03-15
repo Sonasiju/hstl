@@ -7,6 +7,7 @@ import 'presentation/screens/admin_dashboard.dart';
 
 import 'data/providers/auth_provider.dart';
 import 'data/providers/hostel_provider.dart';
+import 'data/providers/routing_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,9 @@ void main() {
         ),
         ChangeNotifierProvider<HostelProvider>(
           create: (_) => HostelProvider(),
+        ),
+        ChangeNotifierProvider<RoutingProvider>(
+          create: (_) => RoutingProvider(),
         ),
       ],
       child: const HostelApp(),

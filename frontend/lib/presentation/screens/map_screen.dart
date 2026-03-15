@@ -208,9 +208,9 @@ class _MapScreenState extends State<MapScreen> {
       final type = (h['type'] ?? '').toString().toLowerCase();
       bool typeMatch = true;
       if (_selectedType == 'Men & Boys') {
-        typeMatch = type == 'boys' || type == 'men' || type == 'mens';
+        typeMatch = type == 'boys' || type == 'men' || type == 'mens' || type == 'gents';
       } else if (_selectedType == 'Girls & Women') {
-        typeMatch = type == 'girls' || type == 'women' || type == 'womens';
+        typeMatch = type == 'girls' || type == 'women' || type == 'womens' || type == 'ladies';
       } else if (_selectedType != 'Any Share') {
         typeMatch = type == _selectedType.toLowerCase();
       }
