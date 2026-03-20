@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 class ApiConfig {
   // Default base URL for production/physical device
   // Change this to your actual server IP or domain
-  static const String _productionUrl = 'http://10.223.111.90:5000';
-  static const String _localUrl = 'http://10.223.111.90:5000';
-  static const String _androidEmulatorUrl = 'http://10.223.111.90:5000';
+  static const String _productionUrl = 'http://  10.99.169.90:5000';
+  static const String _localUrl = 'http://  10.99.169.90:5000';
+  static const String _androidEmulatorUrl = 'http://  10.99.169.90:5000';
 
   /// Returns the appropriate base URL based on the platform and environment
   static String getBaseUrl() {
